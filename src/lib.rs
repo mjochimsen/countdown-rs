@@ -21,7 +21,9 @@ pub struct Countdown(SyncSender<Msg>);
 impl Countdown {
     /// Decrement the [`Countdown`] by `count`. If the [`Countdown`]
     /// thread has unexpectedly terminated then an [`Error::NoCountdown`]
-    /// is returned.
+    /// is returned. If the `count` value is larger than the remaining
+    /// countdown in [`Countdown`], then the [`Countdown`] is reduced to
+    /// zero.
     pub fn decrement(&self, count: usize) -> Result<()> {
         self.0
             .send(Msg::Decrement(count))
@@ -99,7 +101,13 @@ fn run(rx: Receiver<Msg>, count: usize) {
     let mut countdown = count;
     loop {
         match rx.recv() {
-            Ok(Msg::Decrement(c)) => countdown -= c,
+            Ok(Msg::Decrement(c)) => {
+                if c > countdown {
+                    countdown = 0;
+                } else {
+                    countdown -= c;
+                }
+            }
             Ok(Msg::Get(tx)) => tx.send(countdown).unwrap_or(()),
             Err(_err) => break,
         }
@@ -117,6 +125,14 @@ mod tests {
             let result = countdown.decrement(10);
             assert_eq!(result, Ok(()));
         }
+        assert_eq!(countdown.get(), Ok(0));
+    }
+
+    #[test]
+    fn countdown_below_zero() {
+        let countdown = start(10);
+        let result = countdown.decrement(20);
+        assert_eq!(result, Ok(()));
         assert_eq!(countdown.get(), Ok(0));
     }
 
