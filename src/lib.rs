@@ -43,15 +43,24 @@ impl Countdown {
     }
 }
 
+/// Start a new countdown from `count`. A handle to the [`Countdown`] is
+/// returned, which can be used to increment the counter and read its
+/// current value.
+///
+/// The [`Countdown`] will continue to run until the handle (and any
+/// clones) are dropped.
+pub fn start(count: usize) -> Countdown {
+    let (tx, rx) = sync_channel(64);
+    let _handle = spawn(move || run(rx, count));
+    Countdown(tx)
+}
+
 /// An error type for [`Countdown`].
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Error {
     /// The [`Countdown`] thread terminated unexpectedly.
     NoCountdown,
 }
-
-/// A specialized [`Result`] type for `countdown` operations.
-pub type Result<T> = std::result::Result<T, Error>;
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -63,6 +72,9 @@ impl fmt::Display for Error {
     }
 }
 
+/// A specialized [`Result`] type for `countdown` operations.
+pub type Result<T> = std::result::Result<T, Error>;
+
 /// Private message enum used to communicate with the [`Countdown`]
 /// thread.
 #[derive(Debug)]
@@ -72,18 +84,6 @@ enum Msg {
     /// Message used to return the [`Countdown`] value to a different
     /// thread.
     Get(Sender<usize>),
-}
-
-/// Start a new countdown from `count`. A handle to the [`Countdown`] is
-/// returned, which can be used to increment the counter and read its
-/// current value.
-///
-/// The [`Countdown`] will continue to run until the handle (and any
-/// clones) are dropped.
-pub fn start(count: usize) -> Countdown {
-    let (tx, rx) = sync_channel(64);
-    let _handle = spawn(move || run(rx, count));
-    Countdown(tx)
 }
 
 /// Run loop for the countdown. This just initializes the countdown value,
