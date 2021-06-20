@@ -31,10 +31,10 @@ impl Countdown {
             .map_err(|_err| Error::NoCountdown)
     }
 
-    /// Return the current count held by the [`Countdown`]. If the
+    /// Return the progress made by the [`Countdown`]. If the
     /// [`Countdown`] thread has unexpectedly terminated then an
     /// [`Error::NoCountdown`] is returned.
-    pub fn get(&self) -> Result<Progress> {
+    pub fn progress(&self) -> Result<Progress> {
         let (tx, rx) = channel();
         self.0
             .send(Msg::State(tx))
@@ -162,7 +162,7 @@ enum Msg {
 /// corresponding to the [`Sender`] has been dropped, then the loop will
 /// continue without returning a value to the [`Sender`]. This should
 /// never happen, though, as the only way it should be callable is through
-/// [`Countdown::get()`].
+/// [`Countdown::progress()`].
 fn run(rx: Receiver<Msg>, count: usize) {
     let start_time = Instant::now();
     let mut countdown = count;
@@ -199,7 +199,7 @@ mod tests {
             let result = countdown.decrement(10);
             assert_eq!(result, Ok(()));
         }
-        let result = countdown.get();
+        let result = countdown.progress();
         assert!(result.is_ok());
         let progress = result.unwrap();
         assert_eq!(progress.total(), 10_000);
@@ -215,7 +215,7 @@ mod tests {
         let countdown = start(10);
         let result = countdown.decrement(20);
         assert_eq!(result, Ok(()));
-        let result = countdown.get();
+        let result = countdown.progress();
         assert!(result.is_ok());
         let progress = result.unwrap();
         assert_eq!(progress.count(), 0);
