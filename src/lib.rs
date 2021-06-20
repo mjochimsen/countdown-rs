@@ -15,11 +15,24 @@ use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender};
 use std::thread::spawn;
 use std::time::{Duration, Instant};
 
-/// A [`Countdown`] handle. Create it with the [`start`] function.
+/// A [`Countdown`] handle. Create it with the [`Countdown::start`]
+/// function.
 #[derive(Debug, Clone)]
 pub struct Countdown(SyncSender<Msg>);
 
 impl Countdown {
+    /// Start a new countdown from `count`. A handle to the [`Countdown`]
+    /// is returned, which can be used to increment the counter and read
+    /// its current value.
+    ///
+    /// The [`Countdown`] will continue to run until the handle (and any
+    /// clones) are dropped.
+    pub fn start(count: usize) -> Self {
+        let (tx, rx) = sync_channel(64);
+        let _handle = spawn(move || run(rx, count));
+        Self(tx)
+    }
+
     /// Decrement the [`Countdown`] by `count`. If the [`Countdown`]
     /// thread has unexpectedly terminated then an [`Error::NoCountdown`]
     /// is returned. If the `count` value is larger than the remaining
@@ -42,18 +55,6 @@ impl Countdown {
         let state = rx.recv().map_err(|_err| Error::NoCountdown)?;
         Ok(Progress(state))
     }
-}
-
-/// Start a new countdown from `count`. A handle to the [`Countdown`] is
-/// returned, which can be used to increment the counter and read its
-/// current value.
-///
-/// The [`Countdown`] will continue to run until the handle (and any
-/// clones) are dropped.
-pub fn start(count: usize) -> Countdown {
-    let (tx, rx) = sync_channel(64);
-    let _handle = spawn(move || run(rx, count));
-    Countdown(tx)
 }
 
 /// The current progress of the [`Countdown`].
@@ -194,7 +195,7 @@ mod tests {
 
     #[test]
     fn use_countdown() {
-        let countdown = start(10_000);
+        let countdown = Countdown::start(10_000);
         for _i in 0..1000 {
             let result = countdown.decrement(10);
             assert_eq!(result, Ok(()));
@@ -212,7 +213,7 @@ mod tests {
 
     #[test]
     fn countdown_below_zero() {
-        let countdown = start(10);
+        let countdown = Countdown::start(10);
         let result = countdown.decrement(20);
         assert_eq!(result, Ok(()));
         let result = countdown.progress();
