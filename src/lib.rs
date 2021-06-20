@@ -194,21 +194,77 @@ mod tests {
     use super::*;
 
     #[test]
-    fn use_countdown() {
-        let countdown = Countdown::start(10_000);
-        for _i in 0..1000 {
-            let result = countdown.decrement(10);
+    fn start_countdown() {
+        let _countdown = Countdown::start(10);
+    }
+
+    #[test]
+    fn get_progress() {
+        let countdown = Countdown::start(10);
+        for i in 0..5 {
+            let result = countdown.progress();
+            assert!(result.is_ok());
+            let progress = result.unwrap();
+            assert_eq!(progress.total(), 10);
+            assert_eq!(progress.completed(), i * 2);
+            assert_eq!(progress.count(), 10 - (i * 2));
+            let result = countdown.decrement(2);
             assert_eq!(result, Ok(()));
         }
         let result = countdown.progress();
         assert!(result.is_ok());
         let progress = result.unwrap();
-        assert_eq!(progress.total(), 10_000);
-        assert_eq!(progress.completed(), 10_000);
+        assert_eq!(progress.total(), 10);
+        assert_eq!(progress.completed(), 10);
         assert_eq!(progress.count(), 0);
-        assert!(progress.elapsed() >= Duration::new(0, 0));
-        assert!(progress.runtime().unwrap() >= Duration::new(0, 0));
-        assert_eq!(progress.remaining().unwrap(), Duration::new(0, 0));
+    }
+
+    /// Note that this test makes some assumptions about the speed of the
+    /// system it is running on. If the countdown takes longer than 10ms,
+    /// then it will fail.
+    #[test]
+    fn get_time_estimates() {
+        // Set constants for 0s and 10ms.
+        let zero = Duration::new(0, 0);
+        let expected = Duration::new(0, 10_000_000);
+        // Start the Countdown.
+        let countdown = Countdown::start(2);
+        // Get the Progress prior to any decrements.
+        let result = countdown.progress();
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert!(progress.elapsed() < expected);
+        assert!(progress.runtime().is_none());
+        assert!(progress.remaining().is_none());
+        // Decrement by 1.
+        let result = countdown.decrement(1);
+        assert!(result.is_ok());
+        // Get the Progress after the decrement.
+        let result = countdown.progress();
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert!(progress.elapsed() < expected);
+        assert!(progress.runtime().is_some());
+        let runtime = progress.runtime().unwrap();
+        assert!(runtime < expected);
+        assert!(progress.remaining().is_some());
+        let remaining = progress.remaining().unwrap();
+        assert!(remaining < expected);
+        // Decrement by 1.
+        let result = countdown.decrement(1);
+        assert!(result.is_ok());
+        // Get the Progress after the decrement. The Countdown should now
+        // be finished.
+        let result = countdown.progress();
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert!(progress.elapsed() < expected);
+        assert!(progress.runtime().is_some());
+        let runtime = progress.runtime().unwrap();
+        assert!(runtime == progress.elapsed());
+        assert!(progress.remaining().is_some());
+        let remaining = progress.remaining().unwrap();
+        assert!(remaining == zero);
     }
 
     #[test]
@@ -219,6 +275,8 @@ mod tests {
         let result = countdown.progress();
         assert!(result.is_ok());
         let progress = result.unwrap();
+        assert_eq!(progress.total(), 10);
+        assert_eq!(progress.completed(), 10);
         assert_eq!(progress.count(), 0);
     }
 
