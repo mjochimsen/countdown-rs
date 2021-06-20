@@ -34,25 +34,25 @@ impl Countdown {
     }
 
     /// Decrement the [`Countdown`] by `count`. If the [`Countdown`]
-    /// thread has unexpectedly terminated then an [`Error::NoCountdown`]
+    /// thread has unexpectedly terminated then an [`Error::Terminated`]
     /// is returned. If the `count` value is larger than the remaining
     /// countdown in [`Countdown`], then the [`Countdown`] is reduced to
     /// zero.
     pub fn decrement(&self, count: usize) -> Result<()> {
         self.0
             .send(Msg::Decrement(count))
-            .map_err(|_err| Error::NoCountdown)
+            .map_err(|_err| Error::Terminated)
     }
 
     /// Return the progress made by the [`Countdown`]. If the
     /// [`Countdown`] thread has unexpectedly terminated then an
-    /// [`Error::NoCountdown`] is returned.
+    /// [`Error::Terminated`] is returned.
     pub fn progress(&self) -> Result<Progress> {
         let (tx, rx) = channel();
         self.0
             .send(Msg::State(tx))
-            .map_err(|_err| Error::NoCountdown)?;
-        let state = rx.recv().map_err(|_err| Error::NoCountdown)?;
+            .map_err(|_err| Error::Terminated)?;
+        let state = rx.recv().map_err(|_err| Error::Terminated)?;
         Ok(Progress(state))
     }
 }
@@ -114,14 +114,14 @@ impl Progress {
 /// An error type for [`Countdown`].
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Error {
-    /// The [`Countdown`] thread terminated unexpectedly.
-    NoCountdown,
+    /// The [`Countdown`] thread was terminated.
+    Terminated,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::NoCountdown => {
+            Error::Terminated => {
                 write!(f, "Countdown unexpectedly terminated")
             }
         }
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn display_errors() {
         assert_eq!(
-            format!("{}", Error::NoCountdown),
+            format!("{}", Error::Terminated),
             "Countdown unexpectedly terminated"
         );
     }
