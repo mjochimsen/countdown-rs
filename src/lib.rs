@@ -22,11 +22,11 @@ pub struct Countdown(SyncSender<Msg>);
 
 impl Countdown {
     /// Start a new countdown from `count`. A handle to the [`Countdown`]
-    /// is returned, which can be used to increment the counter and read
-    /// its current value.
+    /// is returned, which can be used to decrement the counter and read
+    /// its current progress.
     ///
-    /// The [`Countdown`] will continue to run until the handle (and any
-    /// clones) are dropped.
+    /// The [`Countdown`] will continue to run until all references to it
+    /// are dropped.
     pub fn start(count: usize) -> Self {
         let (tx, rx) = sync_channel(64);
         let _handle = spawn(move || run(rx, count));
@@ -34,8 +34,8 @@ impl Countdown {
     }
 
     /// Decrement the [`Countdown`] by `count`. If the [`Countdown`]
-    /// thread has unexpectedly terminated then an [`Error::Terminated`]
-    /// is returned. If the `count` value is larger than the remaining
+    /// thread has unexpectedly terminated then [`Error::Terminated`] is
+    /// returned. If the `count` value is larger than the remaining
     /// countdown in [`Countdown`], then the [`Countdown`] is reduced to
     /// zero.
     pub fn decrement(&self, count: usize) -> Result<()> {
@@ -45,7 +45,7 @@ impl Countdown {
     }
 
     /// Return the progress made by the [`Countdown`]. If the
-    /// [`Countdown`] thread has unexpectedly terminated then an
+    /// [`Countdown`] thread has unexpectedly terminated then
     /// [`Error::Terminated`] is returned.
     pub fn progress(&self) -> Result<Progress> {
         let (tx, rx) = channel();
@@ -114,11 +114,15 @@ impl Progress {
 /// An error type for [`Countdown`].
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Error {
-    /// The [`Countdown`] thread was terminated.
+    /// The [`Countdown`] thread terminated unexpectedly. This should not
+    /// normally happen, but in a stressed system it may be terminated by
+    /// the OS. The entire process will likely be terminated should this
+    /// happen, though.
     Terminated,
 }
 
 impl fmt::Display for Error {
+    /// Format the Error for display.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Terminated => {
@@ -142,28 +146,32 @@ struct State {
     elapsed: Duration,
 }
 
-/// Private message enum used to communicate with the [`Countdown`]
+/// Private message `enum` used to communicate with the [`Countdown`]
 /// thread.
 #[derive(Debug)]
 enum Msg {
     /// Message used to decrement the [`Countdown`] by a given amount.
     Decrement(usize),
-    /// Message used to return the [`Countdown`] [`State`] to a different
-    /// thread.
+    /// Message used to return the [`State`] of the [`Countdown`] to the
+    /// calling thread.
     State(Sender<State>),
 }
 
 /// Run loop for the countdown. This just initializes the countdown value,
 /// and enters a [`recv<Msg>`](Receiver::recv) loop. The loop will
-/// continue to run until the [`Receiver`] is dropped by the [`Countdown`]
-/// handle. Note that if the [`Countdown`] handle is cloned, then the
-/// thread will run until all clones have been dropped.
+/// continue to run until the [`Receiver`] is dropped by the
+/// [`Countdown`] (which won't happen until the [`Countdown`] itself is
+/// dropped). Note that if the [`Countdown`] handle is cloned, then the
+/// thread will run until all clones have been also been dropped.
 ///
-/// Note that if a [`Msg::State`] message is received and the [`Receiver`]
+/// If a [`Msg::State`] message is received and the [`Receiver`]
 /// corresponding to the [`Sender`] has been dropped, then the loop will
 /// continue without returning a value to the [`Sender`]. This should
 /// never happen, though, as the only way it should be callable is through
-/// [`Countdown::progress()`].
+/// [`Countdown::progress()`], which doesn't drop the [`Sender`] until it
+/// has received the [`Progress`].
+///
+/// Attempts to count down below zero will stop at zero.
 fn run(rx: Receiver<Msg>, count: usize) {
     let start_time = Instant::now();
     let mut countdown = count;
