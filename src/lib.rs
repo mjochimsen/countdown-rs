@@ -102,9 +102,9 @@ impl Progress {
     /// the elapsed time by the number of steps completed. If no steps
     /// have yet been completed, then `None` is returned.
     fn rate(&self) -> Option<f32> {
-        let completed = self.completed() as f32;
-        if completed != 0.0 {
-            Some(self.elapsed().as_secs_f32() / completed)
+        let completed = self.completed();
+        if completed != 0 {
+            Some(self.elapsed().as_secs_f32() / completed as f32)
         } else {
             None
         }
