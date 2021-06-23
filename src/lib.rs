@@ -232,35 +232,44 @@ mod tests {
     /// then it will fail.
     #[test]
     fn get_time_estimates() {
-        // Set constants for 0s and 10ms.
+        use std::thread::sleep;
+        // Set constants for 0s, 2ns, and 10ms.
         let zero = Duration::new(0, 0);
+        let two_ns = Duration::new(0, 2);
         let expected = Duration::new(0, 10_000_000);
-        // Start the Countdown.
+        // Start the Countdown, and wait 2ns.
         let countdown = Countdown::start(2);
+        sleep(two_ns);
         // Get the Progress prior to any decrements.
         let result = countdown.progress();
         assert!(result.is_ok());
         let progress = result.unwrap();
+        assert!(progress.elapsed() > zero);
         assert!(progress.elapsed() < expected);
         assert!(progress.runtime().is_none());
         assert!(progress.remaining().is_none());
-        // Decrement by 1.
+        // Decrement by 1, and wait 2ns.
         let result = countdown.decrement(1);
         assert!(result.is_ok());
+        sleep(two_ns);
         // Get the Progress after the decrement.
         let result = countdown.progress();
         assert!(result.is_ok());
         let progress = result.unwrap();
+        assert!(progress.elapsed() > zero);
         assert!(progress.elapsed() < expected);
         assert!(progress.runtime().is_some());
         let runtime = progress.runtime().unwrap();
+        assert!(runtime > zero);
         assert!(runtime < expected);
         assert!(progress.remaining().is_some());
         let remaining = progress.remaining().unwrap();
+        assert!(remaining > zero);
         assert!(remaining < expected);
-        // Decrement by 1.
+        // Decrement by 1, and wait 2ns.
         let result = countdown.decrement(1);
         assert!(result.is_ok());
+        sleep(two_ns);
         // Get the Progress after the decrement. The Countdown should now
         // be finished.
         let result = countdown.progress();
